@@ -156,10 +156,19 @@ def sample_sequence(model, length, context, num_samples=1, temperature=1, top_k=
                 target_mapping[0, 0, -1] = 1.0  # predict last token
                 inputs = {'input_ids': input_ids, 'perm_mask': perm_mask, 'target_mapping': target_mapping}
 
-            outputs = model(**inputs)  # Note: we could also use 'past' with GPT-2/Transfo-XL/XLNet (cached hidden-states)
-            next_token_logits = outputs[0][0, -1, :] / temperature
-            filtered_logits = top_k_top_p_filtering(next_token_logits, top_k=top_k, top_p=top_p)
-            next_token = torch.multinomial(F.softmax(filtered_logits, dim=-1), num_samples=1)
+            outputs = model(
+                **inputs
+            )  # Note: we could also use 'past' with GPT-2/Transfo-XL/XLNet (cached hidden-states)
+            if temperature == 0:
+                next_token = torch.tensor([torch.argmax(outputs[0][0, -1, :])])
+            else:
+                next_token_logits = outputs[0][0, -1, :] / temperature
+                filtered_logits = top_k_top_p_filtering(
+                    next_token_logits, top_k=top_k, top_p=top_p
+                )
+                next_token = torch.multinomial(
+                    F.softmax(filtered_logits, dim=-1), num_samples=1
+                )
             generated = torch.cat((generated, next_token.unsqueeze(0)), dim=1)
     return generated
 
@@ -170,12 +179,21 @@ def sample_sequence_conditional(model, length, context, past=None, num_samples=1
     generated = context
     with torch.no_grad():
         while True:
-        # for _ in trange(length):
-            inputs = {'input_ids': generated, 'past': past}
-            outputs = model(**inputs)  # Note: we could also use 'past' with GPT-2/Transfo-XL/XLNet (cached hidden-states)
-            next_token_logits = outputs[0][0, -1, :] / temperature
-            filtered_logits = top_k_top_p_filtering(next_token_logits, top_k=top_k, top_p=top_p)
-            next_token = torch.multinomial(F.softmax(filtered_logits, dim=-1), num_samples=1)
+            # for _ in trange(length):
+            inputs = {"input_ids": generated, "past": past}
+            outputs = model(
+                **inputs
+            )  # Note: we could also use 'past' with GPT-2/Transfo-XL/XLNet (cached hidden-states)
+            if temperature == 0:
+                next_token = torch.tensor([torch.argmax(outputs[0][0, -1, :])])
+            else:
+                next_token_logits = outputs[0][0, -1, :] / temperature
+                filtered_logits = top_k_top_p_filtering(
+                    next_token_logits, top_k=top_k, top_p=top_p
+                )
+                next_token = torch.multinomial(
+                    F.softmax(filtered_logits, dim=-1), num_samples=1
+                )
             generated = torch.cat((generated, next_token.unsqueeze(0)), dim=1)
 
             # pdb.set_trace()
